@@ -76,6 +76,7 @@ global.csj.scrappingGoods.RedCrw = function ( data ) {
 	 * }
      * </code>
      */
+    var dirName = new Date().toFormat( 'YYYYMMDDHH24MISS' ).substring( 0, 10 );
     var _processStatus = {
         url                : {
             post   : 'http://m.xiaohongshu.com/api/snsweb/v1/get_related_discovery_by_keyword?keyword=%E9%9F%A9%E5%9B%BD&mode=tag_search&sort=general&page='
@@ -84,12 +85,13 @@ global.csj.scrappingGoods.RedCrw = function ( data ) {
             ,
             search : 'http://m.xiaohongshu.com/api/snsweb/v1/search?keyword=mamonde&mode=word_search'
         }
-        , len              : 30
+        , len              : 400
         , idx              : 1
         , nItemStart       : 0
         , DataResult       : []
         , reRequestCount   : 0
         , fail_request_idx : []
+        , save_dir_name : dirName
     };
     
     //--------------------------------------------------;
@@ -186,7 +188,8 @@ global.csj.scrappingGoods.RedCrw = function ( data ) {
         if ( dataCount > 0 ) {
             logger.log( 'info', "--[I]-- reqData_processor____reqData_write_json Run" );
             t.reRequestCount = 0;
-            _this.reqData_write_json( j );
+            //_this.reqData_write_json( j );
+            _this.stock_add(j)
         }
         
         else {
@@ -201,12 +204,126 @@ global.csj.scrappingGoods.RedCrw = function ( data ) {
      * @function
      * @param {Object} data
      */
+
+
+    _this.stock_add = function (data) {
+
+            var idx = 0
+            var len = data.data.length
+
+            var c = 0
+
+
+            var arr_1 = []
+            var arr_2 = []
+        var date1 = {};
+
+
+        var date2 = {};
+            var bbb = function () {
+
+                if (idx < len) {
+
+
+
+
+                    var redGoods = {}
+                    redGoods.data = data.data[idx]
+                    console.log(redGoods.data.id)
+
+                    var options = {
+                        url: 'http://m.xiaohongshu.com/goods/' + redGoods.data.id,
+                        headers: {
+                            'content-type': 'application/json'
+                        },
+                        timeout: 10000
+
+                    };
+                    try {
+                    request.get(options, function (err, res) {
+                        //console.log(res)
+                        if (res) {
+                            try {
+                                var regex = /<script([^'"]|"(\\.|[^"\\])*"|'(\\.|[^'\\])*')f.*?<\/script>/ig
+                                var s = res.body.match(regex)
+
+                                var page_data_json__string = s[0].replace("<script>facade(\'app-item/detail-page.js\', ", "")
+                                page_data_json__string = page_data_json__string.replace(");</script>", "")
+                                var page_data_json__obj = JSON.parse(page_data_json__string);
+
+                                redGoods.stock = page_data_json__obj.data.stock
+                                redGoods.prd_id = page_data_json__obj.data.item.source_id
+                                redGoods.price = page_data_json__obj.data.item.price
+                                //redGoods.original_price = page_data_json__obj.data.item.source_id
+
+                                //console.log(redGoods)
+
+
+                                date2 = new Date();
+                                logger.log( 'info', "-[E]-- readData_process__3__crwlingDate : ", date2 );
+
+                                redGoods.d_scrapping = {
+                                    y : parseInt(date2.getFullYear())
+                                    , m : parseInt(date2.getMonth()+1)
+                                    , d : parseInt(date2.getDate())
+                                    , ho : parseInt(date2.getHours())
+                                    , mi : parseInt(date2.getMinutes())
+                                    , se : parseInt(date2.getSeconds())
+                                };
+
+
+
+                                arr_1.push(redGoods)
+                                console.log("idx=", idx, " / len=", len)
+                                if (arr_1.length == 500 || idx == len - 1) {
+
+                                    _this.reqData_write_json(arr_1)
+                                    arr_1 = []
+                                    c = 0
+                                }
+                            }
+                            catch (exception) {
+                                logger.log('error', "evt_Complete__logger.log", t.idx, exception);
+                            }
+
+
+                        } else {
+                            logger.log('info', "3__1 : " + c);
+                            ++c
+                            ++idx;
+                            //sleep(300)
+                            bbb()
+                        }
+                        //console.log("arr_1",arr_1)
+                        //console.log("arr_2",arr_2)
+                        //console.log(c)
+                        ++c
+                        ++idx;
+                        //sleep(300)
+                        bbb()
+                    })
+                    }
+                    catch (exception) {
+                        logger.log('error', "evt_Complete__logger.log", t.idx, exception);
+                    }
+                }
+            }
+
+            bbb();
+
+
+            // logger.log('info', "-[E]-- readData_process__3");
+
+    };
+
+
+
     _this.reqData_write_json = function ( data ) {
         logger.log( 'info', "-[S]-- reqData_write_json" );
         var t            = _processStatus;
         var fileFullpath = '../redCrwData/saveCompleteData/goods/';
         
-        var dirName = new Date().toFormat( 'YYYYMMDDHH24MISS' ).substring( 0, 10 );
+        var dirName = t.save_dir_name;
         var fileType = '.json';
         var filename = new Date().toFormat( 'YYYYMMDDHH24MISS' ).substring( 0, 12 ) + '_' + t.idx + fileType;
         
@@ -278,7 +395,8 @@ global.csj.scrappingGoods.RedCrw = function ( data ) {
     var log_path_1 = '/goods'
     var log_path_0 = '/logs';
     
-    var full_path = path.join( __dirname + log_path_0 + log_path_1 + log_path_2 )
+    //var full_path = path.join( __dirname + log_path_0 + log_path_1 + log_path_2 )
+    var full_path = "d:/"
     var logType = { info : 'info', err : 'err' };
     
     var a = fs.existsSync( path + folderName );
